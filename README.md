@@ -1,36 +1,114 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Smart Bookmark App
 
-## Getting Started
+A production-ready bookmark manager built with **Next.js 15 (App Router)**, **Supabase**, and **Tailwind CSS**. This application features secure Google OAuth authentication, Row Level Security (RLS) for data protection, and real-time updates across multiple browser tabs.
 
-First, run the development server:
+## 🚀 Key Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- **Google OAuth Login**: Secure authentication powered by Supabase Auth.
+- **Protected Dashboard**: Server-side route protection ensuring only authenticated users can access their bookmarks.
+- **CRUD Operations**: Add, view, and delete bookmarks with instant feedback.
+- **Real-time Sync**: Uses Supabase Realtime to sync changes across all open tabs instantly.
+- **Security First**: Row Level Security (RLS) ensures users can only access their own data.
+- **Responsive Design**: A clean, premium UI built with Tailwind CSS that works on all devices.
+
+## 🏗 Architecture Explanation
+
+This project follows a modern **Serverless/BaaS** architecture:
+
+- **Frontend**: Next.js App Router for server-rendered pages and client components where interactivity is needed.
+- **Backend-as-a-Service (BaaS)**: Supabase handles everything from Authentication to Database and Real-time subscriptions.
+- **Session Management**: Middleware-based session refreshing using `@supabase/ssr` to ensure the authentication state is always in sync between the client and server.
+- **Data Flow**: 
+  - Server components fetch the initial user state.
+  - Client components handle user interactions and subscribe to database changes via WebSockets (Supabase Realtime).
+
+## 🗄 Database Schema
+
+The application uses a single table in the `public` schema of PostgreSQL:
+
+### `bookmarks` Table
+
+| Column | Type | Description |
+| --- | --- | --- |
+| `id` | `uuid` | Primary key, defaults to `gen_random_uuid()` |
+| `user_id` | `uuid` | Foreign key referencing `auth.users.id` |
+| `title` | `text` | The display name of the bookmark |
+| `url` | `text` | The validated URL |
+| `created_at` | `timestamptz` | Defaults to `now()` |
+
+## 🛡 Row Level Security (RLS)
+
+RLS is enabled to ensure data privacy. The following policies are implemented:
+
+1.  **SELECT**: `auth.uid() = user_id`
+    - Users can only read bookmarks where their user ID matches the record's `user_id`.
+2.  **INSERT**: `auth.uid() = user_id`
+    - Users can only insert new bookmarks where the `user_id` matches their own ID.
+3.  **DELETE**: `auth.uid() = user_id`
+    - Users can only delete their own bookmarks.
+
+### SQL Setup
+```sql
+create table bookmarks (
+  id uuid default gen_random_uuid() primary key,
+  user_id uuid references auth.users not null,
+  title text not null,
+  url text not null,
+  created_at timestamp with time zone default now()
+);
+
+alter table bookmarks enable row level security;
+
+create policy "Users can view their own bookmarks" on bookmarks for select using (auth.uid() = user_id);
+create policy "Users can insert their own bookmarks" on bookmarks for insert with check (auth.uid() = user_id);
+create policy "Users can delete their own bookmarks" on bookmarks for delete using (auth.uid() = user_id);
+
+-- Enable Realtime
+alter publication supabase_realtime add table bookmarks;
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## ⚡ Real-time Implementation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Real-time functionality is implemented using Supabase Channels in the `BookmarkList.tsx` component:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- Upon mounting, the component subscribes to a channel named `bookmarks-realtime`.
+- It listens for `INSERT` and `DELETE` events on the `bookmarks` table.
+- When an event occurs, the local state is updated immediately without a full page refresh:
+  - `INSERT`: Prepend the new record to the list.
+  - `DELETE`: Filter out the deleted record by ID.
 
-## Learn More
+## 🚀 Deployment Steps
 
-To learn more about Next.js, take a look at the following resources:
+1.  **Supabase Setup**:
+    - Create a new project in [Supabase](https://supabase.com).
+    - Run the provided SQL in the SQL Editor.
+    - Go to `Authentication > Providers` and enable **Google**.
+    - Configure Google Cloud Console credentials and paste them into Supabase.
+2.  **Deploy to Vercel**:
+    - Import the repository.
+    - Set Environment Variables:
+      - `NEXT_PUBLIC_SUPABASE_URL`
+      - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+    - Complete the deployment.
+3.  **Configure Redirects**:
+    - In Supabase `Auth > URL Configuration`, add your Vercel URL (e.g., `https://your-app.vercel.app/auth/callback`) to the redirect list.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## 💻 How to Run Locally
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1.  **Clone the repo**:
+    ```bash
+    git clone <your-repo-url>
+    cd smart-bookmark
+    ```
+2.  **Install dependencies**:
+    ```bash
+    npm install
+    ```
+3.  **Setup `.env.local`**:
+    - Copy `.env.example` to `.env.local`.
+    - Fill in your Supabase credentials.
+4.  **Run development server**:
+    ```bash
+    npm run dev
+    ```
+5.  **Open [http://localhost:3000](http://localhost:3000)** in your browser.
