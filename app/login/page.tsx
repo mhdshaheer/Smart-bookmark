@@ -12,10 +12,12 @@ export default function LoginPage() {
   const handleLogin = async () => {
     setLoading(true)
     try {
+      // Use the current origin to construct the callback URL
+      const origin = window.location.origin
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${origin}/auth/callback`,
         },
       })
       if (error) throw error
