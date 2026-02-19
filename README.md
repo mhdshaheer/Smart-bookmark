@@ -112,3 +112,17 @@ Real-time functionality is implemented using Supabase Channels in the `BookmarkL
     npm run dev
     ```
 5.  **Open [http://localhost:3000](http://localhost:3000)** in your browser.
+
+## 🛠 Troubleshooting & Challenges
+
+### 1. Real-time Synchronization Issues
+- **Problem**: New bookmarks were not appearing in real-time across tabs despite having the `.subscribe()` logic in place.
+- **Solution**: Discovered that Supabase requires the table to be explicitly added to the `supabase_realtime` publication. Additionally, adjusted the subscription logic to wait for the Auth session to initialize to prevent race conditions during the initial connection.
+
+### 2. External API 404 Performance (Favicons)
+- **Problem**: Google's Favicon service (`t1.gstatic.com`) returns a 404 error when requested for `localhost` or internal IP addresses, cluttering the developer console and increasing useless network requests.
+- **Solution**: Implemented a filtering utility `getFaviconUrl` that detects local/internal hostnames and provides an immediate inline SVG fallback, preventing the unnecessary network calls.
+
+### 3. Google OAuth Redirect Loop
+- **Problem**: After authentication on production, users were being redirected to `http://localhost:3000` or the root `/` instead of the dashboard.
+- **Solution**: Identified that Supabase strictly validates `redirectTo` URLs for security. Added the production callback URL (`/auth/callback`) to the Supabase "Redirect URLs" whitelist and updated the client-side logic to dynamically pass the current origin to the `signInWithOAuth` function.
